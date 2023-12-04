@@ -1,3 +1,6 @@
 __pycache__/
 
-data/
+data/pdb_protein
+data/pdb_rna
+data/graph_protein
+data/graph_rna
