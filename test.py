@@ -25,7 +25,7 @@ from graphein.rna.edges import (
 # p_1.show()
 
 r_config = RNAGraphConfig()
-g_r = construct_rna_graph_3d(path='data/1ASY_l_u.pdb')
+g_r = construct_rna_graph_3d(path='data/pdb_rna/1AQO.pdb')
 
 p_1 = plotly_rna_structure_graph(g_r)
 p_1.show()
