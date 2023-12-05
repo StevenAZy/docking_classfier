@@ -24,8 +24,15 @@ from graphein.rna.edges import (
 #     )
 # p_1.show()
 
-r_config = RNAGraphConfig()
-g_r = construct_rna_graph_3d(path='data/pdb_rna/1AQO.pdb')
+# r_config = RNAGraphConfig()
+# g_r = construct_rna_graph_3d(path='data/pdb_rna/1AQO.pdb')
 
-p_1 = plotly_rna_structure_graph(g_r)
-p_1.show()
+# p_1 = plotly_rna_structure_graph(g_r)
+# p_1.show()
+
+
+if __name__ == '__main__':
+    from RNABERT.utils.bert import Load_RNABert_Model
+    model = Load_RNABert_Model('RNABERT/weight/bert_mul_2.pth')
+    emb = model.predict_embedding('AUGC')
+    print(emb)

@@ -112,8 +112,8 @@ if __name__ == '__main__':
     pdb_protein_path = 'pdb_protein'
     graph_protein_path = 'graph_protein'
 
-    pdb_rna_path = '/home/steven/code/docking_classfier/data/pdb_rna'
-    graph_rna_path = '/home/steven/code/docking_classfier/data/graph_rna'
+    pdb_rna_path = 'pdb_rna'
+    graph_rna_path = 'graph_rna'
 
     # ids = [name.split('.')[0] for name in os.listdir(pdb_protein_path)]
 
