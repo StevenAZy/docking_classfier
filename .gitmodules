@@ -1,0 +1,3 @@
+[submodule "data/RNABERT"]
+	path = data/RNABERT
+	url = https://github.com/Horikitasaku/RNABERT.git
