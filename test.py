@@ -33,6 +33,6 @@ from graphein.rna.edges import (
 
 if __name__ == '__main__':
     from RNABERT.utils.bert import Load_RNABert_Model
-    model = Load_RNABert_Model('RNABERT/weight/bert_mul_2.pth')
+    model = Load_RNABert_Model('/home/steven/code/docking_classfier/RNABERT/RNABERT.pth')
     emb = model.predict_embedding('AUGC')
-    print(emb)
+    print(emb.size())
