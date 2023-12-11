@@ -20,7 +20,7 @@ protein_model, alphabet = esm.pretrained.esm2_t33_650M_UR50D()
 batch_converter = alphabet.get_batch_converter()
 protein_model.eval()
 
-rna_model = Load_RNABert_Model('/data/lichangyong/code/docking_classfier/data/RNABERT/RNABERT.pth')
+rna_model = Load_RNABert_Model('RNABERT/RNABERT.pth')
 
 new_edge_funcs = {'edge_construction_functions': [partial(add_distance_threshold, long_interaction_threshold=0, threshold=8)]}
 config = ProteinGraphConfig(**new_edge_funcs)
@@ -65,7 +65,7 @@ def rna_graph_node(seq):
         for i in range(len(seq) // 440):
             data = seq[i*440 : (i+1)*440]
             seq_feat.append(rna_model.predict_embedding(data))
-        data = seq[(i+1)* 440:]
+        data = seq[(i+1)*440:]
         seq_feat.append(rna_model.predict_embedding(data))
         seq_feat = torch.cat(seq_feat, dim=0)
     else:
@@ -126,11 +126,11 @@ def rna_graph(pdb_rna_path, graph_rna_path, id):
 
 
 if __name__ == '__main__':
-    pdb_protein_path = '/data/lichangyong/code/docking_classfier/data/pdb_protein'
-    graph_protein_path = '/data/lichangyong/code/docking_classfier/data/graph_protein'
+    pdb_protein_path = 'pdb_protein'
+    graph_protein_path = 'graph_protein'
 
-    pdb_rna_path = '/data/lichangyong/code/docking_classfier/data/pdb_rna'
-    graph_rna_path = '/data/lichangyong/code/docking_classfier/data/graph_rna'
+    pdb_rna_path = 'pdb_rna'
+    graph_rna_path = 'graph_rna'
 
     # ids = [name.split('.')[0] for name in os.listdir(pdb_protein_path)]
 
