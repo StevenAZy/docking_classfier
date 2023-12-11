@@ -6,6 +6,3 @@ data/pdb_protein
 data/pdb_rna
 data/graph_protein
 data/graph_rna
-
-RNABERT/build
-RNABERT/weight
