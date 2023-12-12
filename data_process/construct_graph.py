@@ -14,7 +14,7 @@ from graphein.protein.graphs import construct_graph
 from graphein.protein.edges.distance import add_distance_threshold
 from graphein.rna.graphs import construct_rna_graph_3d
 
-from RNABERT.utils.bert import Load_RNABert_Model
+from data_process.RNABERT.utils.bert import Load_RNABert_Model
 
 protein_model, alphabet = esm.pretrained.esm2_t33_650M_UR50D()
 batch_converter = alphabet.get_batch_converter()
