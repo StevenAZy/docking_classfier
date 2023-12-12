@@ -7,3 +7,4 @@ wget==3.2
 torchvision==0.16.1
 attrdict==2.0.1
 biopython==1.70
+lightning==2.1.2
