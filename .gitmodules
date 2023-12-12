@@ -1,1 +1,3 @@
-
+[submodule "data_process/RNABERT"]
+	path = data_process/RNABERT
+	url = https://github.com/StevenAZy/RNABERT.git
