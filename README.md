@@ -2,7 +2,7 @@
 
 ### Data processing
 ```
-data 
+data_process
 │
 └───graph_protein
 │   │   xxxx.pkl
@@ -20,5 +20,10 @@ data
     │   xxxx.pdb
     │   xxxx.pdb
 ```
-`download_pdb.py` for downloading all pdb files about proteins and RNA.
-`construct_graph.py` for constructing graphs about proteins and RNA.
+`data_process/download_pdb.py` for downloading all pdb files about proteins and RNA.
+
+`data_process/construct_graph.py` for constructing graphs about proteins and RNA.
+
+`data.py` for loading train data.
+
+`main.py` for start train/test.
