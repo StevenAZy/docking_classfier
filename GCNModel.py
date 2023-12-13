@@ -74,7 +74,7 @@ class GCN_DTIMAML(pl.LightningModule):
             args.molecule_dim2,
             args.hidden_dim,
             args.hidden_dim2,
-        )
+        ) 
         self.meta_lr = args.meta_lr
         self.Attention = MultiHeadAttention(
             hidden_size=args.protein_dim2,
