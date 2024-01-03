@@ -22,7 +22,6 @@ from data_process.construct_graph import protein_graph
 from base_model import (
     forwardmodel,
     MultiHeadAttention,
-    update_params,
     LSLRGradientDescentLearningRule,
     plot,
 )
@@ -220,7 +219,9 @@ class GCN_DTIMAML(pl.LightningModule):
             task_cls = []
             task_mi_loss = []
             task_pos_penalty = []
-            protein_edge_index, protein_node_feat = protein_graph(PDB_PROTEIN_PATH, GRAPH_PROTEIN_PATH, pdbID[i])
+            protein_edge_index, protein_node_feat = protein_graph(
+                PDB_PROTEIN_PATH, GRAPH_PROTEIN_PATH, pdbID[i]
+            )
             protein_edge_index = protein_edge_index.to(self.device)
             protein_node_feat = protein_node_feat.to(self.device).detach()
             for step_idx in range(self.num_inner_steps):
@@ -392,7 +393,9 @@ class GCN_DTIMAML(pl.LightningModule):
             batch.edge_index,
             batch.batch,
         )
-        protein_edge_index, protein_node_feat = protein_graph(PDB_PROTEIN_PATH, GRAPH_PROTEIN_PATH, pdbID[i])
+        protein_edge_index, protein_node_feat = protein_graph(
+            PDB_PROTEIN_PATH, GRAPH_PROTEIN_PATH, pdbID[i]
+        )
         protein_edge_index = protein_edge_index.to(self.device)
         protein_node_feat = protein_node_feat.to(self.device).detach()
 
@@ -456,7 +459,9 @@ class GCN_DTIMAML(pl.LightningModule):
             batch.edge_index,
             batch.batch,
         )
-        protein_edge_index, protein_node_feat = protein_graph(PDB_PROTEIN_PATH, GRAPH_PROTEIN_PATH, pdbID[i])
+        protein_edge_index, protein_node_feat = protein_graph(
+            PDB_PROTEIN_PATH, GRAPH_PROTEIN_PATH, pdbID[i]
+        )
         protein_node_feat = protein_node_feat.to(self.device).detach()
         protein_edge_index = protein_edge_index.to(self.device)
 
@@ -498,7 +503,6 @@ class GCN_DTIMAML(pl.LightningModule):
         cal_label = labels.clone()
         with open("transductive_vector.pkl", "wb") as f:
             pickle.dump(np.array(preds.detach().cpu()), f)
-
 
     def zero_shot(
         self,

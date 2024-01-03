@@ -83,7 +83,8 @@ def protein_graph(pdb_protein_path, graph_protein_path, id):
     if os.path.exists(file):
         with open(file, "rb") as f:
             graph = pickle.load(f)
-        return graph.edge_index, graph.x
+        return graph
+        # return graph.edge_index, graph.node_feat
 
     g = construct_graph(config=config, path=f"{pdb_protein_path}/{id}.pdb")
     A = nx.to_numpy_array(g, nonedge=0, weight="distance")
@@ -109,7 +110,8 @@ def rna_graph(pdb_rna_path, graph_rna_path, id):
     if os.path.exists(file):
         with open(file, "rb") as f:
             graph = pickle.load(f)
-        return graph.edge_index, graph.x
+        return graph
+        # return graph.edge_index, graph.node_feat
 
     g = construct_rna_graph_3d(path=f"{pdb_rna_path}/{id}.pdb")
     A = nx.to_numpy_array(g, nonedge=0, weight="distance")

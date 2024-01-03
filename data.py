@@ -46,18 +46,18 @@ def train_rnas(pdb_rna_path, graph_rna_path):
     rna_graphs = {}
     rna_labels = {}
 
-    with open("data_process/data.csv", "r") as f:
+    with open("data_process/train_data.csv", "r") as f:
         reader = csv.reader(f)
         next(reader)
         for _, row in tqdm(enumerate(reader)):
             if row[1] not in rna_graphs.keys():
                 rna_graphs[row[1]] = []
                 rna_labels[row[1]] = []
-            if float(row[3]) == 1:
+            if float(row[2]) == 1:
                 rna_labels[row[1]].append(1)
-            elif float(row[3]) == 0:
+            elif float(row[2]) == 0:
                 rna_labels[row[1]].append(0)
-            graph = rna_graph(pdb_rna_path, graph_rna_path, row[2])
+            graph = rna_graph(pdb_rna_path, graph_rna_path, row[1])
             rna_graphs[row[1]].append(graph)
 
         train_rna_graphs = []
@@ -85,15 +85,15 @@ def train_rnas(pdb_rna_path, graph_rna_path):
         reader = csv.reader(f1)
         next(reader)
         for row in tqdm(reader):
-            if row[0] not in rna_graphs.keys():
-                rna_graphs[row[0]] = []
-                rna_labels[row[0]] = []
-            if float(row[5]) == 1:
-                rna_labels[row[0]].append(1)
-            elif float(row[5]) == 0:
-                rna_labels[row[0]].append(0)
+            if row[1] not in rna_graphs.keys():
+                rna_graphs[row[1]] = []
+                rna_labels[row[1]] = []
+            if float(row[2]) == 1:
+                rna_labels[row[1]].append(1)
+            elif float(row[2]) == 0:
+                rna_labels[row[1]].append(0)
             graph = rna_graph(pdb_rna_path, graph_rna_path, row[1])
-            rna_graphs[row[0]].append(graph)
+            rna_graphs[row[1]].append(graph)
 
         valid_rna_ID = {}
         valid_rna_graphs = []

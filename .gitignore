@@ -6,3 +6,5 @@ data_process/pdb_protein
 data_process/pdb_rna
 data_process/graph_protein
 data_process/graph_rna
+
+*.csv
