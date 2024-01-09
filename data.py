@@ -318,6 +318,34 @@ class FewShotBatchSampler:
         return self.iterations
 
 
+class TrainBatchSampler:
+    def __init__(self, train_rna_datasets, train_shot):
+        self.rna_labels = train_rna_datasets.rna_labels
+        self.rna_ID = train_rna_datasets.rna_ID
+
+        self.train_shot = train_shot
+        self.iterations = 0
+        for protein_name in list(self.rna_ID.keys()):
+            if len(self.rna_ID[protein_name]) % self.train_shot == 0:
+                self.iterations += len(self.rna_ID[protein_name]) // self.train_shot
+            else:
+                self.iterations += len(self.rna_ID[protein_name]) // self.train_shot + 1
+
+    def __iter__(self):
+        for protein_name in list(self.rna_ID.keys()):
+            if len(self.rna_ID[protein_name]) % self.train_shot == 0:
+                n = len(self.rna_ID[protein_name]) // self.train_shot
+            else:
+                n = len(self.rna_ID[protein_name]) // self.train_shot + 1
+            for i in range(n):
+                yield self.rna_ID[protein_name][
+                    i * self.train_shot : (i + 1) * self.train_shot
+                ]
+
+    def __len__(self):
+        return self.iterations
+
+
 class Test_valBatchSampler:
     def __init__(self, Test_val_rna_datasets, val_shot):
         self.rna_labels = Test_val_rna_datasets.rna_labels
@@ -416,12 +444,13 @@ class GCNRNADataModule(LightningDataModule):
         else:
             self.train_rna, self.val_rna = train_rnas(PDB_RNA_PATH, GRAPH_RNA_PATH)
             self.val_batch = Test_valBatchSampler(self.val_rna, self.val_shot)
-            self.train_batch = FewShotBatchSampler(
-                self.train_rna,
-                batch_size=self.batch_size,
-                K_shot=self.k_shot,
-                K_query=self.k_query,
-            )
+            self.train_batch = TrainBatchSampler(self.train_rna, self.k_shot)
+            # self.train_batch = FewShotBatchSampler(
+            #     self.train_rna,
+            #     batch_size=self.batch_size,
+            #     K_shot=self.k_shot,
+            #     K_query=self.k_query,
+            # )
             self.iterations = self.train_batch.iterations
 
     def train_dataloader(self):

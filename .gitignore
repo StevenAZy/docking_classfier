@@ -8,3 +8,7 @@ data_process/graph_protein
 data_process/graph_rna
 
 *.csv
+
+lightning_logs
+train_roc_curve_review_v9
+zero_roc_curve_review_v9
