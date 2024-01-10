@@ -326,21 +326,24 @@ class TrainBatchSampler:
         self.train_shot = train_shot
         self.iterations = 0
         for protein_name in list(self.rna_ID.keys()):
-            if len(self.rna_ID[protein_name]) % self.train_shot == 0:
-                self.iterations += len(self.rna_ID[protein_name]) // self.train_shot
-            else:
-                self.iterations += len(self.rna_ID[protein_name]) // self.train_shot + 1
+            self.iterations += len(self.rna_ID[protein_name])
+            # if len(self.rna_ID[protein_name]) % self.train_shot == 0:
+            #     self.iterations += len(self.rna_ID[protein_name]) // self.train_shot
+            # else:
+            #     self.iterations += len(self.rna_ID[protein_name]) // self.train_shot + 1
 
     def __iter__(self):
         for protein_name in list(self.rna_ID.keys()):
-            if len(self.rna_ID[protein_name]) % self.train_shot == 0:
-                n = len(self.rna_ID[protein_name]) // self.train_shot
-            else:
-                n = len(self.rna_ID[protein_name]) // self.train_shot + 1
+            # if len(self.rna_ID[protein_name]) % self.train_shot == 0:
+            #     n = len(self.rna_ID[protein_name]) // self.train_shot
+            # else:
+            #     n = len(self.rna_ID[protein_name]) // self.train_shot + 1
+            n = len(self.rna_ID[protein_name])
             for i in range(n):
-                yield self.rna_ID[protein_name][
-                    i * self.train_shot : (i + 1) * self.train_shot
-                ]
+                yield self.rna_ID[protein_name][i]
+                # yield self.rna_ID[protein_name][
+                #     i * self.train_shot : (i + 1) * self.train_shot
+                # ]
 
     def __len__(self):
         return self.iterations
@@ -443,7 +446,7 @@ class GCNRNADataModule(LightningDataModule):
             self.test_batch = Test_valBatchSampler(self.test_rna, self.val_shot)
         else:
             self.train_rna, self.val_rna = train_rnas(PDB_RNA_PATH, GRAPH_RNA_PATH)
-            self.val_batch = Test_valBatchSampler(self.val_rna, self.val_shot)
+            # self.val_batch = Test_valBatchSampler(self.val_rna, self.val_shot)
             self.train_batch = TrainBatchSampler(self.train_rna, self.k_shot)
             # self.train_batch = FewShotBatchSampler(
             #     self.train_rna,
@@ -456,9 +459,10 @@ class GCNRNADataModule(LightningDataModule):
     def train_dataloader(self):
         loader = GNN_DataLoader(
             dataset=self.train_rna,
-            batch_sampler=self.train_batch,
+            batch_size=self.batch_size,
+            # batch_sampler=self.train_batch,
             num_workers=self.num_workers,
-            pin_memory=True,
+            pin_memory=False,
         )
 
         return loader
@@ -466,9 +470,10 @@ class GCNRNADataModule(LightningDataModule):
     def val_dataloader(self):
         loader = GNN_DataLoader(
             dataset=self.val_rna,
-            batch_sampler=self.val_batch,
+            batch_size=self.batch_size,
+            # batch_sampler=self.val_batch,
             num_workers=self.num_workers,
-            pin_memory=True,
+            pin_memory=False,
         )
 
         return loader
@@ -476,9 +481,10 @@ class GCNRNADataModule(LightningDataModule):
     def test_dataloader(self):
         loader = GNN_DataLoader(
             dataset=self.test_rna,
-            batch_sampler=self.test_batch,
+            batch_size=self.batch_size,
+            # batch_sampler=self.test_batch,
             num_workers=self.num_workers,
-            pin_memory=True,
+            pin_memory=False,
         )
 
         return loader
