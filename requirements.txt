@@ -8,3 +8,4 @@ torchvision==0.16.1
 attrdict==2.0.1
 biopython==1.70
 pytorch-lightning==2.1.2
+rdkit==2023.9.4
