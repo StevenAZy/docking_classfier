@@ -102,7 +102,7 @@ class forwardmodel(torch.nn.Module):
         batch,
         mode="train",
     ):
-        node_feat = self.molecule_atomencoder(node_feat)
+        node_feat = self.molecule_atomencoder(node_feat.long())
         node_feat = torch.mean(node_feat, dim=-2)
 
         protein_emb = self.protein_GCN(protein_node_feat, protein_edge_index)

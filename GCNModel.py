@@ -200,8 +200,16 @@ class GCN_DTIMAML(pl.LightningModule):
         )
 
     def training_step(self, batch, batch_idx):
-        edge_index, edge_attr, node_feat, label, batch_batch, pdbID = self.new_seperate(
-            batch
+
+        # edge_index, edge_attr, node_feat, label, batch_batch, pdbID = self.new_seperate(
+        #     batch
+        # )
+        node_feat, label, edge_attr, edge_index, train_batch = (
+            batch.x,
+            batch.y,
+            batch.edge_attr,
+            batch.edge_index,
+            batch.batch,
         )
         optim = self.optimizers()
         lr_scheduler = self.lr_schedulers()
@@ -214,16 +222,21 @@ class GCN_DTIMAML(pl.LightningModule):
         total_pos_penalty = []
         total_miloss = []
         old_parms = parameters_to_vector(self.model.parameters())
-        for i in range(len(batch_batch) // 2):
+        for i in range(len(train_batch) // 2):
             task_loss = []
             task_cls = []
             task_mi_loss = []
             task_pos_penalty = []
-            protein_edge_index, protein_node_feat = protein_graph(
-                PDB_PROTEIN_PATH, GRAPH_PROTEIN_PATH, pdbID[i]
+            # protein_edge_index, protein_node_feat = protein_graph(
+            #     PDB_PROTEIN_PATH, GRAPH_PROTEIN_PATH, batch.node_stores[0]["protein_pdbID"][0]
+            # )
+            # protein_edge_index = protein_edge_index.to(self.device)
+            # protein_node_feat = protein_node_feat.to(self.device).detach()
+            _protein_graph = protein_graph(
+                PDB_PROTEIN_PATH, GRAPH_PROTEIN_PATH, batch.node_stores[0]["protein_pdbID"][0]
             )
-            protein_edge_index = protein_edge_index.to(self.device)
-            protein_node_feat = protein_node_feat.to(self.device).detach()
+            protein_edge_index = _protein_graph.edge_index.to(self.device)
+            protein_node_feat = _protein_graph.node_feat.to(self.device).detach()
             for step_idx in range(self.num_inner_steps):
                 per_step_loss_importance_vectors = (
                     self.get_per_step_loss_importance_vector()
@@ -237,7 +250,7 @@ class GCN_DTIMAML(pl.LightningModule):
                     label[i * 2],
                     edge_attr[i * 2],
                     edge_index[i * 2],
-                    batch_batch[i * 2],
+                    train_batch[i * 2],
                     protein_edge_index,
                     protein_node_feat,
                     step_idx,
@@ -255,7 +268,7 @@ class GCN_DTIMAML(pl.LightningModule):
                     label[i * 2 + 1],
                     edge_attr[i * 2 + 1],
                     edge_index[i * 2 + 1],
-                    batch_batch[i * 2 + 1],
+                    train_batch[i * 2 + 1],
                     protein_node_feat,
                     protein_edge_index,
                 )
@@ -353,37 +366,37 @@ class GCN_DTIMAML(pl.LightningModule):
     def get_inner_loop_parameter_dict(self, params):
         return {name: param.to(device=self.device) for name, param in params}
 
-    def new_seperate(self, batch):
-        data_list = batch.to_data_list()
-        edge_index, edge_attr, node_feat, label, batch_batch, pdbID = (
-            [],
-            [],
-            [],
-            [],
-            [],
-            [],
-        )
-        protein_index = {}
-        for index, data in enumerate(data_list):
-            if data.protein_pdbID not in protein_index:
-                protein_index[data.protein_pdbID] = {}
-                protein_index[data.protein_pdbID]["start"] = index
-                protein_index[data.protein_pdbID]["end"] = index
-            protein_index[data.protein_pdbID]["end"] = index
-        for key, value in protein_index.items():
-            start = value["start"]
-            end = value["end"]
-            shot_data = data_list[start : start + 2 * self.K_shot]
-            query_data = data_list[start + 2 * self.K_shot : end + 1]
-            shot_batch = Batch.from_data_list(shot_data)
-            query_batch = Batch.from_data_list(query_data)
-            edge_index.extend([shot_batch.edge_index, query_batch.edge_index])
-            edge_attr.extend([shot_batch.edge_attr, query_batch.edge_attr])
-            node_feat.extend([shot_batch.x, query_batch.x])
-            label.extend([shot_batch.y, query_batch.y])
-            batch_batch.extend([shot_batch.batch, query_batch.batch])
-            pdbID.append(key)
-        return edge_index, edge_attr, node_feat, label, batch_batch, pdbID
+    # def new_seperate(self, batch):
+    #     data_list = batch.to_data_list()
+    #     edge_index, edge_attr, node_feat, label, batch_batch, pdbID = (
+    #         [],
+    #         [],
+    #         [],
+    #         [],
+    #         [],
+    #         [],
+    #     )
+    #     protein_index = {}
+    #     for index, data in enumerate(data_list):
+    #         if data.protein_pdbID not in protein_index:
+    #             protein_index[data.protein_pdbID] = {}
+    #             protein_index[data.protein_pdbID]["start"] = index
+    #             protein_index[data.protein_pdbID]["end"] = index
+    #         protein_index[data.protein_pdbID]["end"] = index
+    #     for key, value in protein_index.items():
+    #         start = value["start"]
+    #         end = value["end"]
+    #         shot_data = data_list[start : start + 2 * self.K_shot]
+    #         query_data = data_list[start + 2 * self.K_shot : end + 1]
+    #         shot_batch = Batch.from_data_list(shot_data)
+    #         query_batch = Batch.from_data_list(query_data)
+    #         edge_index.extend([shot_batch.edge_index, query_batch.edge_index])
+    #         edge_attr.extend([shot_batch.edge_attr, query_batch.edge_attr])
+    #         node_feat.extend([shot_batch.x, query_batch.x])
+    #         label.extend([shot_batch.y, query_batch.y])
+    #         batch_batch.extend([shot_batch.batch, query_batch.batch])
+    #         pdbID.append(key)
+    #     return edge_index, edge_attr, node_feat, label, batch_batch, pdbID
 
     def validation_step(self, batch, batch_idx):
         node_feat, label, edge_attr, edge_index, val_batch = (
@@ -393,11 +406,17 @@ class GCN_DTIMAML(pl.LightningModule):
             batch.edge_index,
             batch.batch,
         )
-        protein_edge_index, protein_node_feat = protein_graph(
-            PDB_PROTEIN_PATH, GRAPH_PROTEIN_PATH, pdbID[i]
+        # protein_edge_index, protein_node_feat = protein_graph(
+        #     PDB_PROTEIN_PATH, GRAPH_PROTEIN_PATH, batch.node_stores[0]["protein_pdbID"][0]
+        # )
+        # protein_edge_index = protein_edge_index.to(self.device)
+        # protein_node_feat = protein_node_feat.to(self.device).detach()
+
+        _protein_graph = protein_graph(
+            PDB_PROTEIN_PATH, GRAPH_PROTEIN_PATH, batch.node_stores[0]["protein_pdbID"][0]
         )
-        protein_edge_index = protein_edge_index.to(self.device)
-        protein_node_feat = protein_node_feat.to(self.device).detach()
+        protein_edge_index = _protein_graph.edge_index.to(self.device)
+        protein_node_feat = _protein_graph.node_feat.to(self.device).detach()
 
         pred, protein_assignment = self.model(
             protein_node_feat,
@@ -459,11 +478,17 @@ class GCN_DTIMAML(pl.LightningModule):
             batch.edge_index,
             batch.batch,
         )
-        protein_edge_index, protein_node_feat = protein_graph(
-            PDB_PROTEIN_PATH, GRAPH_PROTEIN_PATH, pdbID[i]
+        # protein_edge_index, protein_node_feat = protein_graph(
+        #     PDB_PROTEIN_PATH, GRAPH_PROTEIN_PATH, batch.node_stores[0]["protein_pdbID"][0]
+        # )
+        # protein_node_feat = protein_node_feat.to(self.device).detach()
+        # protein_edge_index = protein_edge_index.to(self.device)
+
+        _protein_graph = protein_graph(
+            PDB_PROTEIN_PATH, GRAPH_PROTEIN_PATH, batch.node_stores[0]["protein_pdbID"][0]
         )
-        protein_node_feat = protein_node_feat.to(self.device).detach()
-        protein_edge_index = protein_edge_index.to(self.device)
+        protein_edge_index = _protein_graph.edge_index.to(self.device)
+        protein_node_feat = _protein_graph.node_feat.to(self.device).detach()
 
         pred, protein_assignment = self.model(
             protein_node_feat,
