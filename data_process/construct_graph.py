@@ -14,16 +14,12 @@ from torch_geometric.data import Data
 from graphein.protein.config import ProteinGraphConfig
 from graphein.protein.graphs import construct_graph
 from graphein.protein.edges.distance import add_distance_threshold
-from graphein.rna.graphs import construct_rna_graph_3d
 
 from features import atom_to_feature_vector,bond_to_feature_vector
-from data_process.RNABERT.utils.bert import Load_RNABert_Model
 
 protein_model, alphabet = esm.pretrained.esm2_t33_650M_UR50D()
 batch_converter = alphabet.get_batch_converter()
 protein_model.eval()
-
-rna_model = Load_RNABert_Model("data_process/RNABERT/RNABERT.pth")
 
 new_edge_funcs = {
     "edge_construction_functions": [
@@ -74,20 +70,6 @@ def protein_graph_node(id, seq):
     return seq_feat
 
 
-def rna_graph_node(seq):
-    if len(seq) > 440:
-        seq_feat = []
-        for i in range(len(seq) // 440):
-            data = seq[i * 440 : (i + 1) * 440]
-            seq_feat.append(rna_model.predict_embedding(data))
-        data = seq[(i + 1) * 440 :]
-        seq_feat.append(rna_model.predict_embedding(data))
-        seq_feat = torch.cat(seq_feat, dim=0)
-    else:
-        seq_feat = rna_model.predict_embedding(seq)
-    return seq_feat
-
-
 def protein_graph(pdb_protein_path, graph_protein_path, id):
     file = f"{graph_protein_path}/{id}.pkl"
 
@@ -115,32 +97,6 @@ def protein_graph(pdb_protein_path, graph_protein_path, id):
     return edge_index, node_feat.detach()
 
 
-# def rna_graph(pdb_rna_path, graph_rna_path, id):
-#     file = f"{graph_rna_path}/{id}.pkl"
-
-#     if os.path.exists(file):
-#         with open(file, "rb") as f:
-#             graph = pickle.load(f)
-#         return graph
-#         # return graph.edge_index, graph.node_feat
-
-#     g = construct_rna_graph_3d(path=f"{pdb_rna_path}/{id}.pdb")
-#     A = nx.to_numpy_array(g, nonedge=0, weight="distance")
-#     edge_index = adj2table(A)
-
-#     seq = ""
-#     for key in g.graph.keys():
-#         if key[:9] == "sequence_":
-#             seq += g.graph[key]
-#     if len(seq) != g.number_of_nodes():
-#         raise RuntimeError("number of nodes mismatch")
-#     node_feat = rna_graph_node(seq)
-#     graph = Data(node_feat=node_feat.detach(), edge_index=edge_index.detach())
-
-#     with open(f"{graph_rna_path}/{id}.pkl", "wb") as f:
-#         pickle.dump(graph, f)
-#     return edge_index, node_feat.detach()
-
 def rna_graph(pdb_rna_path, graph_rna_path, id):
 
     file = f"{pdb_rna_path}/{id}.pdb"
@@ -154,6 +110,9 @@ def rna_graph(pdb_rna_path, graph_rna_path, id):
         return graph
     
     mol = Chem.MolFromPDBFile(file)
+
+    if mol is None:
+        return
 
     # atoms
     atom_features_list = []
@@ -190,12 +149,12 @@ def rna_graph(pdb_rna_path, graph_rna_path, id):
         edge_index = np.empty((2, 0), dtype = np.int64)
         edge_attr = np.empty((0, num_bond_features), dtype = np.int64)
 
-    x = convert_to_single_emb(torch.tensor(x))
+    node_feat = convert_to_single_emb(torch.tensor(x))
     graph = dict()
     graph['edge_index'] = torch.tensor(edge_index)
     graph['edge_feat'] = torch.tensor(edge_attr)
-    graph['node_feat'] = x
-    graph['num_nodes'] = len(x)
+    graph['node_feat'] = node_feat
+    graph['num_nodes'] = len(node_feat)
     with open(f"{graph_rna_path}/{id}.pkl", "wb") as f:
         pickle.dump(graph, f)
     return graph
