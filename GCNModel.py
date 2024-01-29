@@ -201,16 +201,16 @@ class GCN_DTIMAML(pl.LightningModule):
 
     def training_step(self, batch, batch_idx):
 
-        # edge_index, edge_attr, node_feat, label, batch_batch, pdbID = self.new_seperate(
-        #     batch
-        # )
-        node_feat, label, edge_attr, edge_index, train_batch = (
-            batch.x,
-            batch.y,
-            batch.edge_attr,
-            batch.edge_index,
-            batch.batch,
+        edge_index, edge_attr, node_feat, label, train_batch, pdbID = self.new_seperate(
+            batch
         )
+        # node_feat, label, edge_attr, edge_index, train_batch = (
+        #     batch.x,
+        #     batch.y,
+        #     batch.edge_attr,
+        #     batch.edge_index,
+        #     batch.batch,
+        # )
         optim = self.optimizers()
         lr_scheduler = self.lr_schedulers()
         optim.zero_grad()
@@ -366,37 +366,37 @@ class GCN_DTIMAML(pl.LightningModule):
     def get_inner_loop_parameter_dict(self, params):
         return {name: param.to(device=self.device) for name, param in params}
 
-    # def new_seperate(self, batch):
-    #     data_list = batch.to_data_list()
-    #     edge_index, edge_attr, node_feat, label, batch_batch, pdbID = (
-    #         [],
-    #         [],
-    #         [],
-    #         [],
-    #         [],
-    #         [],
-    #     )
-    #     protein_index = {}
-    #     for index, data in enumerate(data_list):
-    #         if data.protein_pdbID not in protein_index:
-    #             protein_index[data.protein_pdbID] = {}
-    #             protein_index[data.protein_pdbID]["start"] = index
-    #             protein_index[data.protein_pdbID]["end"] = index
-    #         protein_index[data.protein_pdbID]["end"] = index
-    #     for key, value in protein_index.items():
-    #         start = value["start"]
-    #         end = value["end"]
-    #         shot_data = data_list[start : start + 2 * self.K_shot]
-    #         query_data = data_list[start + 2 * self.K_shot : end + 1]
-    #         shot_batch = Batch.from_data_list(shot_data)
-    #         query_batch = Batch.from_data_list(query_data)
-    #         edge_index.extend([shot_batch.edge_index, query_batch.edge_index])
-    #         edge_attr.extend([shot_batch.edge_attr, query_batch.edge_attr])
-    #         node_feat.extend([shot_batch.x, query_batch.x])
-    #         label.extend([shot_batch.y, query_batch.y])
-    #         batch_batch.extend([shot_batch.batch, query_batch.batch])
-    #         pdbID.append(key)
-    #     return edge_index, edge_attr, node_feat, label, batch_batch, pdbID
+    def new_seperate(self, batch):
+        data_list = batch.to_data_list()
+        edge_index, edge_attr, node_feat, label, batch_batch, pdbID = (
+            [],
+            [],
+            [],
+            [],
+            [],
+            [],
+        )
+        protein_index = {}
+        for index, data in enumerate(data_list):
+            if data.protein_pdbID not in protein_index:
+                protein_index[data.protein_pdbID] = {}
+                protein_index[data.protein_pdbID]["start"] = index
+                protein_index[data.protein_pdbID]["end"] = index
+            protein_index[data.protein_pdbID]["end"] = index
+        for key, value in protein_index.items():
+            start = value["start"]
+            end = value["end"]
+            shot_data = data_list[start : start + 2 * self.K_shot]
+            query_data = data_list[start + 2 * self.K_shot : end + 1]
+            shot_batch = Batch.from_data_list(shot_data)
+            query_batch = Batch.from_data_list(query_data)
+            edge_index.extend([shot_batch.edge_index, query_batch.edge_index])
+            edge_attr.extend([shot_batch.edge_attr, query_batch.edge_attr])
+            node_feat.extend([shot_batch.x, query_batch.x])
+            label.extend([shot_batch.y, query_batch.y])
+            batch_batch.extend([shot_batch.batch, query_batch.batch])
+            pdbID.append(key)
+        return edge_index, edge_attr, node_feat, label, batch_batch, pdbID
 
     def validation_step(self, batch, batch_idx):
         node_feat, label, edge_attr, edge_index, val_batch = (

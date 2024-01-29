@@ -99,7 +99,7 @@ def protein_graph(pdb_protein_path, graph_protein_path, id):
 
 def rna_graph(pdb_rna_path, graph_rna_path, id):
 
-    file = f"{pdb_rna_path}/{id}.pdb"
+    file = f"{graph_rna_path}/{id}.pkl"
     if os.path.exists(file):
         with open(file, "rb") as f:
             try:
@@ -109,7 +109,7 @@ def rna_graph(pdb_rna_path, graph_rna_path, id):
                 exit()
         return graph
     
-    mol = Chem.MolFromPDBFile(file)
+    mol = Chem.MolFromPDBFile(f'{pdb_rna_path}/{id}.pdb')
 
     if mol is None:
         return
