@@ -28,7 +28,8 @@ class RNADataset:
             data = Data(
                 x=rna_graphs[i]["node_feat"],
                 edge_index=rna_graphs[i]["edge_index"],
-                y=rna_labels[i],
+                edge_attr=rna_graphs[i]["edge_feat"],
+                y=rna_labels[i]
             )
             data.protein_pdbID = names[i]
             data.edge_num = rna_graphs[i]["edge_index"].shape[1]

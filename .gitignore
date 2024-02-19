@@ -6,9 +6,12 @@ data_process/pdb_protein
 data_process/pdb_rna
 data_process/graph_protein
 data_process/graph_rna
+data_process/graph_rna_old
 
 *.csv
 
 lightning_logs
 train_roc_curve_review_v9
 zero_roc_curve_review_v9
+
+GCN_maml+checkpoint
