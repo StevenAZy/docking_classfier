@@ -72,17 +72,17 @@ class forwardmodel(torch.nn.Module):
         protein_dim1,
         protein_dim2,
         protein_dim3,
-        molecule_dim1,
-        molecule_dim2,
+        rna_dim1,
+        rna_dim2,
         hidden_dim,
         hidden_dim2,
     ):
         super(forwardmodel, self).__init__()
-        self.molecule_atomencoder = nn.Embedding(
-            512 * 9 + 1, molecule_dim1, padding_idx=0
+        self.rna_atomencoder = nn.Embedding(
+            512 * 9 + 1, rna_dim1, padding_idx=0
         )
         self.protein_GCN = GCN(protein_dim1, protein_dim2, protein_dim3)
-        self.molecule_GCN = moleculeGCN(molecule_dim1, molecule_dim2, hidden_dim)
+        self.rna_GCN = rnaGCN(rna_dim1, rna_dim2, hidden_dim)
         self.protein_subgraph = GIBGCN(protein_dim3, hidden_dim)
 
         self.cat_MLP = MLP(2 * hidden_dim, hidden_dim2, 1)
@@ -102,14 +102,14 @@ class forwardmodel(torch.nn.Module):
         batch,
         mode="train",
     ):
-        node_feat = self.molecule_atomencoder(node_feat.long())
+        node_feat = self.rna_atomencoder(node_feat.long())
         node_feat = torch.mean(node_feat, dim=-2)
 
         protein_emb = self.protein_GCN(protein_node_feat, protein_edge_index)
-        molecule_embedding = self.molecule_GCN(node_feat, edge_index, edge_attr, batch)
+        rna_embedding = self.rna_GCN(node_feat, edge_index, edge_attr, batch)
 
-        protein_emb = protein_emb.repeat(molecule_embedding.shape[0], 1, 1)
-        molecule_embedding_con = molecule_embedding.unsqueeze(1).repeat(
+        protein_emb = protein_emb.repeat(rna_embedding.shape[0], 1, 1)
+        rna_embedding_con = rna_embedding.unsqueeze(1).repeat(
             1, protein_emb.shape[1], 1
         )
         (
@@ -122,16 +122,16 @@ class forwardmodel(torch.nn.Module):
             protein_emb,
             protein_edge_index,
             [0 for _ in range(protein_emb.shape[0])],
-            molecule_embedding_con,
+            rna_embedding_con,
         )
 
-        molecule_graph_embedding = F.relu(self.fc1(molecule_embedding))
-        molecule_graph_embedding = F.dropout(
-            molecule_graph_embedding, p=0.5, training=self.training
+        rna_graph_embedding = F.relu(self.fc1(rna_embedding))
+        rna_graph_embedding = F.dropout(
+            rna_graph_embedding, p=0.5, training=self.training
         )
-        molecule_graph_embedding = self.fc2(molecule_graph_embedding)
+        rna_graph_embedding = self.fc2(rna_graph_embedding)
 
-        pred = self.cat_MLP(torch.cat([out, molecule_graph_embedding], dim=1))
+        pred = self.cat_MLP(torch.cat([out, rna_graph_embedding], dim=1))
         if mode == "train":
             protein_mi_loss = self.sum_loss(
                 self.protein_discriminator,
@@ -143,7 +143,7 @@ class forwardmodel(torch.nn.Module):
                 protein_pos_penalty,
                 protein_mi_loss,
                 torch.mean(
-                    torch.cat([protein_subgraph_emb, molecule_embedding], dim=1),
+                    torch.cat([protein_subgraph_emb, rna_embedding], dim=1),
                     dim=0,
                     keepdim=True,
                 ),
@@ -225,9 +225,9 @@ class GCN(torch.nn.Module):
         return x
 
 
-class moleculeGCN(nn.Module):
+class rnaGCN(nn.Module):
     def __init__(self, in_channels, hidden_channels, out_channels, num_layers=3):
-        super(moleculeGCN, self).__init__()
+        super(rnaGCN, self).__init__()
         self.conv1 = GCNConv(in_channels, hidden_channels, add_self_loops=True)
         self.convs = torch.nn.ModuleList()
         for i in range(num_layers - 2):
@@ -344,9 +344,9 @@ class GIBGCN(torch.nn.Module):
 
         return all_pos_embedding, all_graph_embedding, all_pos_penalty
 
-    def forward(self, emb, edge_index, batch, molecule_embedding):
+    def forward(self, emb, edge_index, batch, rna_embedding):
         assignment = torch.nn.functional.softmax(
-            self.assignment(torch.cat([emb, molecule_embedding], dim=-1)), dim=-1
+            self.assignment(torch.cat([emb, rna_embedding], dim=-1)), dim=-1
         )
         all_subgraph_embedding, all_graph_embedding, all_pos_penalty = self.aggregate(
             assignment, emb, batch, edge_index

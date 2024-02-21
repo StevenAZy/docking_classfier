@@ -7,6 +7,7 @@ import numpy as np
 import pytorch_lightning as pl
 
 from math import cos, pi
+from torch.utils.tensorboard import SummaryWriter
 from torch.nn.utils import vector_to_parameters, parameters_to_vector
 from torch_geometric.data import Batch
 from torchmetrics.functional.classification import (
@@ -26,6 +27,7 @@ from base_model import (
     plot,
 )
 
+sw = SummaryWriter('./log')
 directory = ["./train_roc_curve_review_v9/", "./zero_roc_curve_review_v9/"]
 
 
@@ -200,146 +202,183 @@ class GCN_DTIMAML(pl.LightningModule):
         )
 
     def training_step(self, batch, batch_idx):
+        edge_index, edge_attr, node_feat, label, train_batch, pdbID = self.new_seperate(batch)
 
-        edge_index, edge_attr, node_feat, label, train_batch, pdbID = self.new_seperate(
-            batch
-        )
-        # node_feat, label, edge_attr, edge_index, train_batch = (
-        #     batch.x,
-        #     batch.y,
-        #     batch.edge_attr,
-        #     batch.edge_index,
-        #     batch.batch,
-        # )
-        optim = self.optimizers()
-        lr_scheduler = self.lr_schedulers()
-        optim.zero_grad()
-        preds = []
-        labels = []
-        weight_sumemb = []
-        total_loss = []
-        total_cls = []
-        total_pos_penalty = []
-        total_miloss = []
-        old_parms = parameters_to_vector(self.model.parameters())
-        for i in range(len(train_batch) // 2):
-            task_loss = []
-            task_cls = []
-            task_mi_loss = []
-            task_pos_penalty = []
-            # protein_edge_index, protein_node_feat = protein_graph(
-            #     PDB_PROTEIN_PATH, GRAPH_PROTEIN_PATH, batch.node_stores[0]["protein_pdbID"][0]
-            # )
-            # protein_edge_index = protein_edge_index.to(self.device)
-            # protein_node_feat = protein_node_feat.to(self.device).detach()
+        batch_loss = []
+        batch_mi_loss = []
+        for i in range(len(train_batch)):
             _protein_graph = protein_graph(
-                PDB_PROTEIN_PATH, GRAPH_PROTEIN_PATH, batch.node_stores[0]["protein_pdbID"][0]
+                PDB_PROTEIN_PATH, GRAPH_PROTEIN_PATH, pdbID[i]
             )
             protein_edge_index = _protein_graph.edge_index.to(self.device)
             protein_node_feat = _protein_graph.node_feat.to(self.device).detach()
-            for step_idx in range(self.num_inner_steps):
-                per_step_loss_importance_vectors = (
-                    self.get_per_step_loss_importance_vector()
-                )
-                names_weights_copy = self.get_inner_loop_parameter_dict(
-                    self.model.named_parameters()
-                )
-                self.support_step(
-                    names_weights_copy,
-                    node_feat[i * 2],
-                    label[i * 2],
-                    edge_attr[i * 2],
-                    edge_index[i * 2],
-                    train_batch[i * 2],
-                    protein_edge_index,
-                    protein_node_feat,
-                    step_idx,
-                )
-                (
-                    loss,
-                    cls,
-                    pos_penalty,
-                    mi_loss,
-                    pred,
-                    single_label,
-                    weight_emb,
-                ) = self.query_step(
-                    node_feat[i * 2 + 1],
-                    label[i * 2 + 1],
-                    edge_attr[i * 2 + 1],
-                    edge_index[i * 2 + 1],
-                    train_batch[i * 2 + 1],
+            
+            loss, cls, pos_penalty, mi_loss, pred, single_label, weight_emb = self.query_step(
+                    node_feat[i],
+                    label[i],
+                    edge_attr[i],
+                    edge_index[i],
+                    train_batch[i],
                     protein_node_feat,
                     protein_edge_index,
                 )
-                task_loss.append(per_step_loss_importance_vectors[step_idx] * loss)
-                task_cls.append(cls.detach())
-                task_pos_penalty.append(pos_penalty.detach())
-                task_mi_loss.append(mi_loss.detach())
-            task_loss = torch.sum(torch.stack(task_loss))
-            task_cls = torch.sum(torch.stack(task_cls)) / len(task_cls)
-            task_pos_penalty = torch.sum(torch.stack(task_pos_penalty)) / len(
-                task_pos_penalty
-            )
-            task_mi_loss = torch.sum(torch.stack(task_mi_loss)) / len(task_mi_loss)
-            total_loss.append(task_loss)
-            total_cls.append(task_cls)
-            total_pos_penalty.append(task_pos_penalty)
-            total_miloss.append(task_mi_loss)
-            preds.append(pred.detach())
-            weight_sumemb.append(weight_emb.detach())
-            labels.append(single_label.detach())
-            vector_to_parameters(old_parms, self.model.parameters())
-
-        weight_sumemb = torch.cat(weight_sumemb, dim=0)
-        loss_weight = self.Attention(weight_sumemb, weight_sumemb, weight_sumemb)
-        """loss_weight=[]
-        for i in range(len(batch_batch) // 2):
-            max_value, max_index = torch.max(batch_batch[i*2+1],dim=0)
-            loss_weight.append(1/(max_value.item()+1))
-        total_count = sum(loss_weight)
-        loss_weight = [count / total_count for count in loss_weight]"""
-
-        total_loss = torch.dot(
-            torch.stack(total_loss, dim=0),
-            torch.tensor(loss_weight).to(total_loss[0].device),
-        )
-        # total_loss=torch.sum(loss_weight*torch.stack(total_loss,dim=0))
-        optim.zero_grad()
-        total_loss.backward()
-        optim.step()
-        lr_scheduler.step()
-
-        preds = torch.cat(preds, dim=0)
-        labels = torch.cat(labels, dim=0)
-        acc = binary_accuracy(preds, labels)
-        auroc = binary_auroc(preds, labels)
-        auprc = binary_average_precision(preds, labels)
-        F1 = binary_f1_score(preds, labels)
-        fpr, tpr, _ = binary_roc(preds, labels)
-        plot(
-            fpr.cpu(),
-            tpr.cpu(),
-            "False Positive Rate",
-            "True Positive Rate",
-            batch_idx,
-            dir=directory[0],
-        )
-
-        self.log("train_cls", sum(total_cls) / len(total_cls), sync_dist=True)
-        self.log(
-            "train_pos_penalty",
-            sum(total_pos_penalty) / len(total_pos_penalty),
-            sync_dist=True,
-        )
-        self.log("train_miloss", sum(total_miloss) / len(total_miloss), sync_dist=True)
-        self.log("train_loss", total_loss, sync_dist=True)
-        self.log("train_acc", acc, sync_dist=True)
-        self.log("train_auroc", auroc, sync_dist=True)
-        self.log("train_auprc", auprc, sync_dist=True)
-        self.log("train_F1", F1, sync_dist=True)
-        self.log("task_lr", torch.tensor(self.task_lr), sync_dist=True)
+            batch_loss.append(loss.detach().cpu().numpy())
+            batch_mi_loss.append(mi_loss.detach().cpu().numpy())
+            
+        sw.add_scalar('loss', np.mean(batch_loss), self.current_epoch)
+        sw.add_scalar('mi_loss', np.mean(batch_mi_loss), self.current_epoch)
+    
         return None
+
+    # def training_step(self, batch, batch_idx):
+
+    #     edge_index, edge_attr, node_feat, label, train_batch, pdbID = self.new_seperate(
+    #         batch
+    #     )
+    #     # node_feat, label, edge_attr, edge_index, train_batch = (
+    #     #     batch.x,
+    #     #     batch.y,
+    #     #     batch.edge_attr,
+    #     #     batch.edge_index,
+    #     #     batch.batch,
+    #     # )
+    #     optim = self.optimizers()
+    #     lr_scheduler = self.lr_schedulers()
+    #     optim.zero_grad()
+    #     preds = []
+    #     labels = []
+    #     weight_sumemb = []
+    #     total_loss = []
+    #     total_cls = []
+    #     total_pos_penalty = []
+    #     total_miloss = []
+    #     old_parms = parameters_to_vector(self.model.parameters())
+    #     for i in range(len(train_batch) // 2):
+    #         task_loss = []
+    #         task_cls = []
+    #         task_mi_loss = []
+    #         task_pos_penalty = []
+    #         # protein_edge_index, protein_node_feat = protein_graph(
+    #         #     PDB_PROTEIN_PATH, GRAPH_PROTEIN_PATH, batch.node_stores[0]["protein_pdbID"][0]
+    #         # )
+    #         # protein_edge_index = protein_edge_index.to(self.device)
+    #         # protein_node_feat = protein_node_feat.to(self.device).detach()
+    #         _protein_graph = protein_graph(
+    #             PDB_PROTEIN_PATH, GRAPH_PROTEIN_PATH, batch.node_stores[0]["protein_pdbID"][0]
+    #         )
+    #         protein_edge_index = _protein_graph.edge_index.to(self.device)
+    #         protein_node_feat = _protein_graph.node_feat.to(self.device).detach()
+    #         for step_idx in range(self.num_inner_steps):
+    #             per_step_loss_importance_vectors = (
+    #                 self.get_per_step_loss_importance_vector()
+    #             )
+    #             names_weights_copy = self.get_inner_loop_parameter_dict(
+    #                 self.model.named_parameters()
+    #             )
+    #             # self.support_step(
+    #             #     names_weights_copy,
+    #             #     node_feat[i * 2],
+    #             #     label[i * 2],
+    #             #     edge_attr[i * 2],
+    #             #     edge_index[i * 2],
+    #             #     train_batch[i * 2],
+    #             #     protein_edge_index,
+    #             #     protein_node_feat,
+    #             #     step_idx,
+    #             # )
+    #             (
+    #                 loss,
+    #                 cls,
+    #                 pos_penalty,
+    #                 mi_loss,
+    #                 pred,
+    #                 single_label,
+    #                 weight_emb,
+    #             ) = self.query_step(
+    #                 node_feat[i * 2 + 1],
+    #                 label[i * 2 + 1],
+    #                 edge_attr[i * 2 + 1],
+    #                 edge_index[i * 2 + 1],
+    #                 train_batch[i * 2 + 1],
+    #                 protein_node_feat,
+    #                 protein_edge_index,
+    #             )
+    #             task_loss.append(per_step_loss_importance_vectors[step_idx] * loss)
+    #             task_cls.append(cls.detach())
+    #             task_pos_penalty.append(pos_penalty.detach())
+    #             task_mi_loss.append(mi_loss.detach())
+    #         task_loss = torch.sum(torch.stack(task_loss))
+    #         task_cls = torch.sum(torch.stack(task_cls)) / len(task_cls)
+    #         task_pos_penalty = torch.sum(torch.stack(task_pos_penalty)) / len(
+    #             task_pos_penalty
+    #         )
+    #         task_mi_loss = torch.sum(torch.stack(task_mi_loss)) / len(task_mi_loss)
+    #         total_loss.append(task_loss)
+    #         total_cls.append(task_cls)
+    #         total_pos_penalty.append(task_pos_penalty)
+    #         total_miloss.append(task_mi_loss)
+    #         preds.append(pred.detach())
+    #         weight_sumemb.append(weight_emb.detach())
+    #         labels.append(single_label.detach())
+    #         vector_to_parameters(old_parms, self.model.parameters())
+
+    #     weight_sumemb = torch.cat(weight_sumemb, dim=0)
+    #     loss_weight = self.Attention(weight_sumemb, weight_sumemb, weight_sumemb)
+    #     """loss_weight=[]
+    #     for i in range(len(batch_batch) // 2):
+    #         max_value, max_index = torch.max(batch_batch[i*2+1],dim=0)
+    #         loss_weight.append(1/(max_value.item()+1))
+    #     total_count = sum(loss_weight)
+    #     loss_weight = [count / total_count for count in loss_weight]"""
+
+    #     total_loss = torch.dot(
+    #         torch.stack(total_loss, dim=0),
+    #         torch.tensor(loss_weight).to(total_loss[0].device),
+    #     )
+    #     # total_loss=torch.sum(loss_weight*torch.stack(total_loss,dim=0))
+    #     optim.zero_grad()
+    #     total_loss.backward()
+    #     optim.step()
+    #     lr_scheduler.step()
+
+    #     preds = torch.cat(preds, dim=0)
+    #     labels = torch.cat(labels, dim=0)
+    #     acc = binary_accuracy(preds, labels)
+    #     auroc = binary_auroc(preds, labels)
+    #     auprc = binary_average_precision(preds, labels)
+    #     F1 = binary_f1_score(preds, labels)
+    #     fpr, tpr, _ = binary_roc(preds, labels)
+
+    #     sw.add_scalar('acc', acc, batch_idx)
+    #     sw.add_scalar('auroc', auroc, batch_idx)
+    #     sw.add_scalar('auprc', auprc, batch_idx)
+    #     sw.add_scalar('F1', F1, batch_idx)
+    #     # sw.add_scalar('fpr', fpr)
+    #     # sw.add_scalar('tpr', tpr)
+
+    #     plot(
+    #         fpr.cpu(),
+    #         tpr.cpu(),
+    #         "False Positive Rate",
+    #         "True Positive Rate",
+    #         batch_idx,
+    #         dir=directory[0],
+    #     )
+
+    #     self.log("train_cls", sum(total_cls) / len(total_cls), sync_dist=True)
+    #     self.log(
+    #         "train_pos_penalty",
+    #         sum(total_pos_penalty) / len(total_pos_penalty),
+    #         sync_dist=True,
+    #     )
+    #     self.log("train_miloss", sum(total_miloss) / len(total_miloss), sync_dist=True)
+    #     self.log("train_loss", total_loss, sync_dist=True)
+    #     self.log("train_acc", acc, sync_dist=True)
+    #     self.log("train_auroc", auroc, sync_dist=True)
+    #     self.log("train_auprc", auprc, sync_dist=True)
+    #     self.log("train_F1", F1, sync_dist=True)
+    #     self.log("task_lr", torch.tensor(self.task_lr), sync_dist=True)
+    #     return None
 
     def get_per_step_loss_importance_vector(self):
         loss_weights = np.ones(shape=(self.num_inner_steps)) * (

@@ -26,7 +26,7 @@ def add_args(parser):
     parser.add_argument("--meta_lr", type=float, default=1e-5)
     parser.add_argument("--task_lr", type=float, default=1e-4)
     parser.add_argument("--few_lr", type=float, default=0.01)
-    parser.add_argument("--total_epoch", type=int, default=500)
+    parser.add_argument("--total_epoch", type=int, default=5000)
     parser.add_argument("--few_epoch", type=int, default=10)
     parser.add_argument("--num_inner_steps", type=int, default=5)
     parser.add_argument("--test", action="store_true", default=False)
