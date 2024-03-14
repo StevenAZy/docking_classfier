@@ -2,11 +2,7 @@
 .DS_Store
 __pycache__/
 
-data_process/pdb_protein
-data_process/pdb_rna
-data_process/graph_protein
-data_process/graph_rna
-data_process/graph_rna_old
+data_process/*/
 
 *.csv
 
@@ -16,3 +12,8 @@ zero_roc_curve_review_v9
 
 GCN_maml+checkpoint
 log
+
+rpiseq_err.txt
+rpiseq.txt
+
+test.py
