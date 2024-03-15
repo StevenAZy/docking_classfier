@@ -107,7 +107,8 @@ def rna_graph(pdb_rna_path, graph_rna_path, id):
             except:
                 print(file)
                 exit()
-        return graph
+        return Data(node_feat=graph['node_feat'], edge_index=graph['edge_index'])
+        # return graph
     
     mol = Chem.MolFromPDBFile(f'{pdb_rna_path}/{id}.pdb')
 

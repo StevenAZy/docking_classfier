@@ -1,11 +1,13 @@
 import os
+import torch
 import datetime
 import argparse
 import pytorch_lightning as pl
 
 from pytorch_lightning.callbacks import ModelCheckpoint, LearningRateMonitor
+from torch_geometric.loader import DataLoader
 
-from data import GCNRNADataModule
+from data import P_RPairDataset
 from GCNModel import GCN_DTIMAML
 
 
@@ -47,17 +49,11 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(prog="docking_classfier")
     args = add_args(parser)
 
-    pl.seed_everything(42)
+    train_dataset = P_RPairDataset(data_path='./data_process/train_data.csv')
+    train_dataloader = DataLoader(train_dataset, batch_size=4)
 
-    RNA_data = GCNRNADataModule(
-        num_workers=args.num_workers,
-        batch_size=args.batch_size,
-        k_shot=args.k_shot,
-        k_query=args.k_query,
-        val_shot=args.val_shot,
-        test=args.test,
-        explanation=args.explanation,
-    )
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.01)
+    criterion = torch.nn.CrossEntropyLoss()
 
     if not args.test and not args.explanation:
         time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
