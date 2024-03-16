@@ -7,49 +7,34 @@ from torch_geometric.nn import GCNConv
 from torch_geometric.nn import global_mean_pool
 
 
-class PGCN(torch.nn.Module):
-    def __init__(self, hidden_channels):
-        super(PGCN, self).__init__()
+class MolecularGCN(torch.nn.Module):
+    def __init__(self, input_channels, hidden_channels):
+        super(MolecularGCN, self).__init__()
         torch.manual_seed(12345)
-        self.conv = GCNConv(1280, hidden_channels)
-
+        self.conv = GCNConv(input_channels, hidden_channels)
+        
     def forward(self, node_feat, edge_index, batch):
-        # 1. Obtain node embeddings 
-        p = self.conv(node_feat, edge_index)
-        p = p.relu()
-        gmp_p = global_mean_pool(p, batch)
+        x = self.conv(node_feat, edge_index)
+        x = x.relu()
+        gmp_x = global_mean_pool(x, batch)
         
-        return gmp_p
-    
+        return gmp_x
 
-class RGCN(torch.nn.Module):
-    def __init__(self, hidden_channels):
-        super(RGCN, self).__init__()
-        torch.manual_seed(12345)
-        self.p_conv = GCNConv(1280, hidden_channels)
-        self.r_conv = GCNConv(120, hidden_channels)
-        self.conv3 = GCNConv(hidden_channels, hidden_channels)
-        self.lin = Linear(hidden_channels, 2)
 
-    def forward(self, p_node_feat, p_edge_index, r_node_feat, r_edge_index, batch):
-        # 1. Obtain node embeddings 
-        # p = self.p_conv(p_node_feat, p_edge_index)
-        # p = p.relu()
-        # gmp_p = global_mean_pool(p, batch)
-        p = 0
 
-        r = self.r_conv(r_node_feat, r_edge_index)
-        r = r.relu()
-        gmp_r = global_mean_pool(r, batch)
+class MyModel(torch.nn.Module):
+    def __init__(self):
+        super(MyModel, self).__init__()
+        self.p_conv = MolecularGCN(1280, 64)
+        self.r_conv = MolecularGCN(120, 64)
+        self.lin = Linear(128, 2)
 
-        p_r = torch.concatenate((p, r), dim=0)
-        # 2. Readout layer 
-        x = global_mean_pool(p_r, batch)  # [batch_size, hidden_channels]
+    def forward(self, data):
+        p_conv = self.p_conv(data[0].node_feat.cuda(), data[0].edge_index.cuda(), data[0].batch.cuda())
+        r_conv = self.r_conv(data[1].node_feat.cuda(), data[1].edge_index.cuda(), data[1].batch.cuda())
 
-        # 3. Apply a final classifier
-        x = F.dropout(p_r, p=0.5, training=self.training)
-        x = self.lin(x)
-        
-        return x
+        p_r = torch.concatenate((p_conv, r_conv), dim=1)
+        p_r = F.dropout(p_r, p=0.5, training=self.training)
+        p_r = self.lin(p_r)
 
-# model = GCN(hidden_channels=64)
+        return p_r
