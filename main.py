@@ -1,112 +1,110 @@
-import os
-import datetime
-import argparse
-import pytorch_lightning as pl
+import torch
+import numpy as np
 
-from pytorch_lightning.callbacks import ModelCheckpoint, LearningRateMonitor
+from tqdm import tqdm
+from torch_geometric.loader import DataLoader
+from torch.utils.tensorboard import SummaryWriter
 
-from data import GCNRNADataModule
-from GCNModel import GCN_DTIMAML
-
-
-directory = ["./train_roc_curve_review_v9/", "./zero_roc_curve_review_v9/"]
-
-
-def add_args(parser):
-    parser.add_argument("--weight_decay", type=float, default=1)
-    parser.add_argument("--protein_dim1", type=int, default=1280)
-    parser.add_argument("--protein_dim2", type=int, default=512)
-    parser.add_argument("--protein_dim3", type=int, default=256)
-    parser.add_argument("--molecule_dim1", type=int, default=256)
-    parser.add_argument("--molecule_dim2", type=int, default=512)
-    parser.add_argument("--hidden_dim", type=int, default=256)
-    parser.add_argument("--hidden_dim2", type=int, default=64)
-    parser.add_argument("--attention_dropout_rate", type=float, default=0.1)
-    parser.add_argument("--num_heads", type=int, default=8)
-    parser.add_argument("--meta_lr", type=float, default=1e-5)
-    parser.add_argument("--task_lr", type=float, default=1e-4)
-    parser.add_argument("--few_lr", type=float, default=0.01)
-    parser.add_argument("--total_epoch", type=int, default=500)
-    parser.add_argument("--few_epoch", type=int, default=10)
-    parser.add_argument("--num_inner_steps", type=int, default=5)
-    parser.add_argument("--test", action="store_true", default=False)
-    parser.add_argument("--val", action="store_true", default=False)
-    parser.add_argument("--explanation", action="store_true", default=False)
-    parser.add_argument("--k_shot", type=int, default=5)
-    parser.add_argument("--k_query", type=int, default=50)
-    parser.add_argument("--val_shot", type=int, default=50)
-    parser.add_argument("--num_workers", type=int, default=0)
-    parser.add_argument("--batch_size", type=int, default=4)
-    parser.add_argument("--project_name", type=str, default="GCN_maml")
-    parser.add_argument("--n_layers", type=int, default=6)
-    parser.add_argument("--checkpoint_path", type=str, default="")
-    return parser.parse_args()
+from config import *
+from model import MyModel
+from metric import calculate_metrics
+from data import P_RPairDataset, collate
 
 
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(prog="docking_classfier")
-    args = add_args(parser)
+sw = SummaryWriter('log')
 
-    pl.seed_everything(42)
+def train():
+    train_dataset = P_RPairDataset(data_path=TRAIN_DATA_PATH)
+    train_dataloader  = DataLoader(dataset=train_dataset, batch_size=BATCH_SIZE, shuffle=True, collate_fn=collate)
 
-    RNA_data = GCNRNADataModule(
-        num_workers=args.num_workers,
-        batch_size=args.batch_size,
-        k_shot=args.k_shot,
-        k_query=args.k_query,
-        val_shot=args.val_shot,
-        test=args.test,
-        explanation=args.explanation,
-    )
+    val_dataset = P_RPairDataset(data_path=VAL_DATA_PATH)
+    val_dataloader  = DataLoader(dataset=val_dataset, batch_size=BATCH_SIZE, shuffle=True, collate_fn=collate)
 
-    if not args.test and not args.explanation:
-        time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        print(time)
-        for dir in directory:
-            if not os.path.exists(dir):
-                os.mkdir(dir)
-            else:
-                for root, dirs, files in os.walk(dir, topdown=False):
-                    for name in files:
-                        os.remove(os.path.join(root, name))  # 删除文件
-                    for name in dirs:
-                        os.rmdir(os.path.join(root, name))
-        # wandb_logger = WandbLogger(name=args.project_name, project="GCN_maml")
-        args.iteration = RNA_data.iterations
-        model = GCN_DTIMAML(args=args)
+    model = MyModel().cuda()
+    optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)
+    criterion = torch.nn.CrossEntropyLoss()
 
-        dirpath = args.project_name + "+checkpoint"
-        checkpoint_callback = ModelCheckpoint(
-            monitor="zero_auroc",
-            dirpath=dirpath,
-            filename="-{epoch:03d}-{zero_auroc:.4f}-{zero_loss:.4f}-",
-            save_top_k=50,
-            mode="max",
-            save_last=True,
-        )
-        # trainer = pl.Trainer(devices=[0],accelerator="gpu",logger=wandb_logger,max_epochs=args.total_epoch,callbacks=[checkpoint_callback]
-        #                  ,log_every_n_steps=1)
-        trainer = pl.Trainer(
-            devices=[0],
-            accelerator="gpu",
-            max_epochs=args.total_epoch,
-            callbacks=[checkpoint_callback],
-            log_every_n_steps=1,
-        )
+    for epoch in range(EPOCH):
+        epoch_loss = []
+        train_pbar = tqdm(train_dataloader, desc=f'epoch-{epoch}')
+        for train_data in train_pbar:
+        # for train_data in tqdm(train_dataloader, desc=f'epoch-{epoch}'):
+            train_labels = torch.tensor([int(label) for label in train_data[2]], dtype=torch.long).cuda()
+            out = model(train_data)
+            loss = criterion(out, train_labels)
+            loss.backward()  # Derive gradients.
+            optimizer.step()  # Update parameters based on gradients.
+            optimizer.zero_grad()
+            train_pbar.set_description(f'epoch-{epoch},loss:{loss.detach().cpu().numpy()}', refresh=True)
+            epoch_loss.append(loss.detach().cpu().numpy())
+        
+        sw.add_scalar('train_loss', np.mean(epoch_loss), epoch)
 
-        trainer.callbacks.append(LearningRateMonitor(logging_interval="step"))
+        model.eval()
 
-    else:
-        args.iteration = 1
-        molecule_model = GCN_DTIMAML.load_from_checkpoint(
-            args.checkpoint_path, args=args
-        )
-        trainer = pl.Trainer(devices=[0], accelerator="gpu")
-    # trainer.validate(molecule_model, datamodule=molecule_data)
-    if args.test or args.explanation:
-        trainer.test(model, datamodule=RNA_data)
+        all_preds = []
+        all_labels = []
 
-    elif args.val:
-        trainer.validate(model, datamodule=RNA_data)
-    else:
-        trainer.fit(model, datamodule=RNA_data)
+        val_pbar = tqdm(val_dataloader, desc=f'val_acc:')
+        for val_data in val_pbar:
+            preds = model(val_data)
+            preds = preds.argmax(dim=1)
+            all_preds.extend(preds)
+
+            val_labels = torch.tensor([int(label) for label in val_data[2]], dtype=torch.long).cuda()
+            all_labels.extend(val_labels)
+
+            batch_acc = int((preds == val_labels).sum()) / BATCH_SIZE
+            val_pbar.set_description(f'val_acc:{batch_acc}', refresh=True)
+
+        all_labels = [label.cpu().detach().numpy() for label in all_labels]
+        all_preds = [pred.cpu().detach().numpy() for pred in all_preds]
+        accuracy, precision, recall, f1, cm = calculate_metrics(all_labels, all_preds)
+        sw.add_scalar('val_acc', accuracy, epoch)
+        sw.add_scalar('val_pre', precision, epoch)
+        sw.add_scalar('val_rec', recall, epoch)
+        sw.add_scalar('val_f1', f1, epoch)
+        sw.add_image('val_cm', torch.from_numpy(cm), dataformats='HW')
+
+        if (epoch + 1) % SAVE_EPOCH == 0:
+            torch.save(model.state_dict(), f'{MODEL_SAVE_PATH}/checkpoint_{epoch+1}.pth')
+
+
+def test(save_epoch = 100):
+    model = MyModel().cuda()
+    model.load_state_dict(torch.load(f'{MODEL_SAVE_PATH}/checkpoint_{save_epoch}.pth'))
+    model.eval()
+
+    test_dataset = P_RPairDataset(data_path=TEST_DATA_PATH)
+    test_dataloader  = DataLoader(dataset=test_dataset, batch_size=BATCH_SIZE, shuffle=True, collate_fn=collate)
+
+    test_pbar = tqdm(test_dataloader, desc=f'test_acc:')
+
+    all_preds = []
+    all_labels = []
+
+    for test_data in test_pbar:
+        preds = model(test_data)
+        preds = preds.argmax(dim=1)
+        all_preds.extend(preds)
+
+        test_labels = torch.tensor([int(label) for label in test_data[2]], dtype=torch.long).cuda()
+        all_labels.extend(test_labels)
+
+        batch_acc = int((preds == test_labels).sum()) / BATCH_SIZE
+        test_pbar.set_description(f'test_acc:{batch_acc}', refresh=True)
+
+    all_labels = [label.cpu().detach().numpy() for label in all_labels]
+    all_preds = [pred.cpu().detach().numpy() for pred in all_preds]
+    accuracy, precision, recall, f1, cm = calculate_metrics(all_labels, all_preds)
+    sw.add_scalar('test_acc', accuracy)
+    sw.add_scalar('test_pre', precision)
+    sw.add_scalar('test_rec', recall)
+    sw.add_scalar('test_f1', f1)
+    sw.add_image('test_cm', torch.from_numpy(cm), dataformats='HW')
+
+
+
+if __name__ == '__main__':
+    train()
+    # test()

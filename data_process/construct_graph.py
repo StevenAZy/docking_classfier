@@ -107,7 +107,8 @@ def rna_graph(pdb_rna_path, graph_rna_path, id):
             except:
                 print(file)
                 exit()
-        return graph
+        return Data(node_feat=graph['node_feat'], edge_index=graph['edge_index'])
+        # return graph
     
     mol = Chem.MolFromPDBFile(f'{pdb_rna_path}/{id}.pdb')
 
@@ -157,7 +158,7 @@ def rna_graph(pdb_rna_path, graph_rna_path, id):
     graph['num_nodes'] = len(node_feat)
     with open(f"{graph_rna_path}/{id}.pkl", "wb") as f:
         pickle.dump(graph, f)
-    return graph
+    return Data(node_feat=node_feat.detach(), edge_index=edge_index.detach())
 
 # if __name__ == "__main__":
 #     pdb_protein_path = "pdb_protein"
