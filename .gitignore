@@ -6,11 +6,7 @@ data_process/*/
 
 *.csv
 
-lightning_logs
-train_roc_curve_review_v9
-zero_roc_curve_review_v9
-
-GCN_maml+checkpoint
+models
 log
 
 rpiseq_err.txt

@@ -29,12 +29,8 @@ class P_RPairDataset(Dataset):
         idx_data = self.all_data[idx].split('-')
 
         p_graph = protein_graph(PDB_PROTEIN_PATH, GRAPH_PROTEIN_PATH, idx_data[0])
-        r_graph = rna_graph(PDB_RNA_PATH, GRAPH_RNA_PATH, idx_data[1])
+        r_graph = rna_graph(PDB_RNA_PATH, GRAPH_RNA_PATH, idx_data[1]).cpu()
         label = idx_data[2]
-
-        # p_r_pairdata = Data(p_node_feat = p_graph.node_feat, p_edge_index = p_graph.edge_index,
-        #                     r_node_feat = r_graph.node_feat, r_edge_index = r_graph.edge_index,
-        #                     label = label)
 
         return p_graph, r_graph, label
     
