@@ -6,7 +6,7 @@ from torch_geometric.loader import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 
 from model import MyModel
-from metric import calculate_metrics
+from metric import calculate_metrics, roc_auc_plt
 from data import P_RPairDataset, collate
 
 
@@ -64,7 +64,6 @@ def train():
         sw.add_scalar('val_rec', recall, epoch)
         sw.add_scalar('val_f1', f1, epoch)
         sw.add_image('val_cm', torch.from_numpy(cm), dataformats='HW')
-
         if (epoch + 1) % 100 == 0:
             torch.save(model.state_dict(), f'models/checkpoint_{epoch+1}.pth')
 
@@ -95,6 +94,7 @@ def test():
 
     all_labels = [label.cpu().detach().numpy() for label in all_labels]
     all_preds = [pred.cpu().detach().numpy() for pred in all_preds]
+    roc_auc_plt(all_labels, all_preds)
     accuracy, precision, recall, f1, cm = calculate_metrics(all_labels, all_preds)
     sw.add_scalar('test_acc', accuracy)
     sw.add_scalar('test_pre', precision)

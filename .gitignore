@@ -8,6 +8,7 @@ data_process/*/
 
 models
 log
+plt
 
 rpiseq_err.txt
 rpiseq.txt
