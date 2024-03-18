@@ -5,10 +5,8 @@ import os
 import esm
 import torch
 import pickle
-import numpy as np
 import networkx as nx
 
-from rdkit import Chem
 from functools import partial
 from torch_geometric.data import Data
 from graphein.protein.config import ProteinGraphConfig
@@ -16,7 +14,6 @@ from graphein.protein.graphs import construct_graph
 from graphein.rna.graphs import construct_rna_graph_3d
 from graphein.protein.edges.distance import add_distance_threshold
 
-# from features import atom_to_feature_vector,bond_to_feature_vector
 from data_process.RNABERT.utils.bert import Load_RNABert_Model
 
 protein_model, alphabet = esm.pretrained.esm2_t33_650M_UR50D()
@@ -112,7 +109,8 @@ def protein_graph(pdb_protein_path, graph_protein_path, id):
 
     with open(f"{graph_protein_path}/{id}.pkl", "wb") as f:
         pickle.dump(graph, f)
-    return edge_index, node_feat.detach()
+    return graph
+    # return edge_index, node_feat.detach()
 
 
 def rna_graph(pdb_rna_path, graph_rna_path, id):
@@ -139,25 +137,27 @@ def rna_graph(pdb_rna_path, graph_rna_path, id):
 
     with open(f"{graph_rna_path}/{id}.pkl", "wb") as f:
         pickle.dump(graph, f)
-    return edge_index, node_feat.detach()
+    return graph
+    # return edge_index, node_feat.detach()
 
-# if __name__ == "__main__":
-#     pdb_protein_path = "pdb_protein"
-#     graph_protein_path = "graph_protein"
+if __name__ == "__main__":
+    # convert protein pdb into graph
+    pdb_protein_path = "pdb_protein"
+    graph_protein_path = "graph_protein"
 
-#     pdb_rna_path = "pdb_rna"
-#     graph_rna_path = "graph_rna"
+    ids = [name.split('.')[0] for name in os.listdir(pdb_protein_path)]
 
-    # ids = [name.split('.')[0] for name in os.listdir(pdb_protein_path)]
+    for id in ids:
+        try:
+            protein_graph(pdb_protein_path, graph_protein_path, id)
+        except:
+            print(id)
+            continue
+    
+    # convert rna pdb into graph
+    pdb_rna_path = "pdb_rna"
+    graph_rna_path = "graph_rna"
+    ids = [name.split(".")[0] for name in os.listdir(pdb_rna_path)]
 
-    # for id in ids:
-    #     try:
-    #         protein_graph(pdb_protein_path, graph_protein_path, id)
-    #     except:
-    #         print(id)
-    #         continue
-
-    # ids = [name.split(".")[0] for name in os.listdir(pdb_rna_path)]
-
-    # for id in ids:
-    #     rna_graph(pdb_rna_path, graph_rna_path, id)
+    for id in ids:
+        rna_graph(pdb_rna_path, graph_rna_path, id)
